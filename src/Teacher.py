@@ -11,9 +11,9 @@ class Model(QSqlQueryModel):
 
     def refresh(self):
         sql = '''
-                    select id_teacher, fio, phone, email, comnt
-                    from teachers
-                '''
+            select id_teacher, fio, phone, email, comnt
+            from teachers
+    '''
         self.setQuery(sql)
 
 
@@ -32,7 +32,7 @@ class Model(QSqlQueryModel):
         update_query.bindValue(':phone', phone)
         update_query.bindValue(':email', email)
         update_query.bindValue(':comnt', comnt)
-        update_query.bindValue('id_teacher', id_teacher)
+        update_query.bindValue(':id_teacher', id_teacher)
         ans = update_query.exec()
         print(ans, update_query.lastQuery())
         update_query.clear()
@@ -47,6 +47,15 @@ class Model(QSqlQueryModel):
         get_query.prepare(sql)
         get_query.bindValue(':id_teacher', id_teacher)
         get_query.exec()
+        if get_query.isActive():
+            get_query.first()
+            return (get_query.value('fio'),
+                    get_query.value('phone'),
+                    get_query.value('email'),
+                    get_query.value('comnt'))
+        self.refresh()
+        return "", "", "", ""
+
 
 
     def add(self, fio, phone, email, comnt):
@@ -61,37 +70,65 @@ class Model(QSqlQueryModel):
         add_query.bindValue(':email', email)
         add_query.bindValue(':comnt', comnt)
         ans = add_query.exec()
-        print(ans, add_query.lastQuery())
         add_query.clear()
+        self.refresh()
+
+    def delete(self, id_teacher):
+        del_query = QSqlQuery()
+        DELETE = """
+            delete from teachers where id_teacher = :id_teacher;
+        """
+        del_query.prepare(DELETE)
+        del_query.bindValue(':id_teacher', id_teacher)
+        del_query.exec()
         self.refresh()
 
 class View(QTableView):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
         model = Model(parent=self)
+        self.setMinimumWidth(800)
         self.setModel(model)
+        self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
+        self.setSelectionMode(self.SelectionMode.SingleSelection)
+        self.hideColumn(0)
+        vh = self.verticalHeader()
+        vh.setSectionResizeMode(vh.ResizeMode.Fixed)
+        self.setWordWrap(False)
+
+        hh = self.horizontalHeader()
+        hh.setSectionResizeMode(hh.ResizeMode.ResizeToContents)
+
+        hh.setSectionResizeMode(4, hh.ResizeMode.Stretch)
+
+        # self.setHorizontalHeader(1, Qt.Horizontal)
 
     pyqtSlot()
     def add(self):
-        # QMessageBox.information(self, 'Учитель', 'Добавление')
         dialog = Dialog(parent=self)
         if dialog.exec():
-            self.model().add(dialog.fio, dialog.phone, dialog.email, dialog.cmnt)
+            self.model().add(dialog.fio, dialog.phone, dialog.email, dialog.comnt)
 
     pyqtSlot()
     def update(self):
         dialog = Dialog(parent=self)
         row = self.currentIndex().row()
         id_teacher = self.model().record(row).value(0)
-        dialog.fio, dialog.phone, dialog.email, dialog.cmnt = self.model().get_teacher(id_teacher)
-        if dialog.exec():
-            self.model().update(dialog.fio, dialog.phone, dialog.email, dialog.cmnt, id_teacher)
+        dialog.fio, dialog.phone, dialog.email, dialog.comnt = self.model().get_teacher(id_teacher)
+        if not dialog.fio:
+            QMessageBox.information(self, 'Учитель', 'Учитель не найден в базе\n Возможно запись была удалена ранее')
+        elif dialog.exec():
+            self.model().update(dialog.fio, dialog.phone, dialog.email, dialog.comnt, id_teacher)
 
     pyqtSlot()
     def delete(self):
-        QMessageBox.information(self, 'Учитель', 'Удаление')
+        ans = QMessageBox.question(self, 'Учитель', 'Вы уверены?')
+        if ans == QMessageBox.StandardButton.Yes:
+            row = self.currentIndex().row()
+            id_teacher = self.model().record(row).value(0)
+
+            self.model().delete(id_teacher)
 
 class Dialog(QDialog):
     def __init__(self, parent=None):
@@ -119,7 +156,8 @@ class Dialog(QDialog):
 
         cancel_btn.clicked.connect(self.reject)
 
-        lay = QVBoxLayout()
+        lay = QVBoxLayout(self)
+
         lay.addWidget(fio_lbl)
         lay.addWidget(self.__fio_edt)
         lay.addWidget(phone_lbl)
@@ -142,6 +180,7 @@ class Dialog(QDialog):
     @pyqtSlot()
     def finish(self):
         if self.fio is None:
+            QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не может быть пустым!')
             return
         self.accept()
 
@@ -183,13 +222,13 @@ class Dialog(QDialog):
         self.__email_edt.setText(value)
 
     @property
-    def cmnt(self):
+    def comnt(self):
         result = self.__comment_edt.toPlainText().strip()
         if result == '':
             return None
         else:
             return result
 
-    @cmnt.setter
-    def cmnt(self, value):
+    @comnt.setter
+    def comnt(self, value):
         self.__comment_edt.setText(value)
