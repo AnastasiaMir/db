@@ -184,6 +184,12 @@ class Dialog(QDialog):
 
     @pyqtSlot()
     def finish(self):
+        def contains_no_digits_loop(text):
+            """Checks if a string contains no digits using a loop (less efficient)."""
+            for char in text:
+                if not char.isalpha() and char != " ":
+                    return False
+            return True
 
         def is_valid_phone_phonenumbers(phone_number):
             """Phone number validation using the 'phonenumbers' library."""
@@ -200,8 +206,9 @@ class Dialog(QDialog):
         if self.fio is None:
             QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не может быть пустым!')
             return
-        if not self.fio.isalpha():
-            QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не должно содержать цифры')
+        if not contains_no_digits_loop(self.fio):
+            print(self.fio)
+            QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не должно содержать цифры или другие символы')
             return
         if not is_valid_phone_phonenumbers(self.phone):
             QMessageBox.information(self, 'Ошибка', 'Заполните поле "Телефон" корректно!')
