@@ -2,6 +2,8 @@
 from PyQt6.QtWidgets import QPushButton, QTextEdit, QTableView, QMessageBox, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtSql import QSqlQueryModel, QSqlQuery
+import validators
+import phonenumbers
 
 
 class Model(QSqlQueryModel):
@@ -182,9 +184,33 @@ class Dialog(QDialog):
 
     @pyqtSlot()
     def finish(self):
+
+        def is_valid_phone_phonenumbers(phone_number):
+            """Phone number validation using the 'phonenumbers' library."""
+            try:
+                z = phonenumbers.parse(phone_number)
+                return phonenumbers.is_valid_number(z)
+            except phonenumbers.phonenumberutil.NumberParseException:
+                return False
+
+        def is_valid_email_validators(email):
+            """Email validation using the 'validators' library."""
+            return validators.email(email)
+
         if self.fio is None:
             QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не может быть пустым!')
             return
+        if not self.fio.isalpha():
+            QMessageBox.information(self, 'Ошибка', 'Поле "Фамилия И.О." не должно содержать цифры')
+            return
+        if not is_valid_phone_phonenumbers(self.phone):
+            QMessageBox.information(self, 'Ошибка', 'Заполните поле "Телефон" корректно!')
+            return
+
+        if not is_valid_email_validators(self.email):
+            QMessageBox.information(self, 'Ошибка', 'Заполните поле "Email" корректно!')
+            return
+
         self.accept()
 
 
