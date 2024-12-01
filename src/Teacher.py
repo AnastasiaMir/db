@@ -1,6 +1,6 @@
 
 from PyQt6.QtWidgets import QPushButton, QTextEdit, QTableView, QMessageBox, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QLineEdit
-from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtSql import QSqlQueryModel, QSqlQuery
 
 
@@ -89,6 +89,10 @@ class View(QTableView):
         super().__init__(parent)
         model = Model(parent=self)
         self.setMinimumWidth(800)
+        model.setHeaderData(1, Qt.Orientation.Horizontal, 'ФИО')
+        model.setHeaderData(2, Qt.Orientation.Horizontal, 'Телефон')
+        model.setHeaderData(3, Qt.Orientation.Horizontal, 'Электронная почта')
+        model.setHeaderData(4, Qt.Orientation.Horizontal, 'Примечание')
         self.setModel(model)
         self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
         self.setSelectionMode(self.SelectionMode.SingleSelection)
@@ -102,7 +106,6 @@ class View(QTableView):
 
         hh.setSectionResizeMode(4, hh.ResizeMode.Stretch)
 
-        # self.setHorizontalHeader(1, Qt.Horizontal)
 
     pyqtSlot()
     def add(self):
