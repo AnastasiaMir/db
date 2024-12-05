@@ -1,14 +1,11 @@
-
-
 from PyQt6.QtWidgets import (
     QTableView, QMessageBox, QComboBox,
     QDialog, QHBoxLayout, QVBoxLayout,
     QLabel, QLineEdit, QTextEdit, QPushButton
 )
-from PyQt6.QtSql import QSqlTableModel, QSqlQuery, QSqlRecord
+from PyQt6.QtSql import QSqlTableModel, QSqlQuery
 from PyQt6.QtCore import Qt, pyqtSlot
 
-from src.Teacher import Dialog
 
 
 class Model(QSqlTableModel):
@@ -17,23 +14,29 @@ class Model(QSqlTableModel):
         self.refresh()
         self.__authors = {}
         self.selectAuthors()
-        # self.setTable('tests')
-        # self.setEditStrategy(self.EditStrategy.OnManualSubmit)
-        # self.select()
+
     @property
     def author_id(self, fio):
         return self.__authors[fio]
 
+    @property
+    def authors(self):
+        return self.__authors.keys()
+
     def refresh(self):
         sql = """
-            select t.id_test, t.tname, t.tcontent, a.fio from teats as t, teachers as a
-            where t.teacher_id = a.id_teacher;
+            select t.id_test, t.tname, t.tcontent,
+            a.fio from teats as t, teachers as a
+            where t.teacher_id = a.id_teacher
+            union
+            select id_test, tname, tcontent, ''
+            from tests where teacher_id is null;
         """
         self.setQuery(sql)
 
     def add(self, tname, tcontent, teacher):
         add_query = QSqlQuery()
-        teacher_id =self.author_id(teacher)
+        teacher_id = None if (teacher == "") else self.author_id(teacher)
         INSERT = """
             insert into tests (tname, tcontent, teacher_id)
             values(:tname, :tcontent, :teacher_id);
@@ -55,6 +58,11 @@ class Model(QSqlTableModel):
         sql_query.prepare(SELECT_ONE)
         sql_query.bindValue(':id_test', id_test)
         sql_query.exec()
+        if sql_query.isActive():
+            sql_query.first()
+            return (sql_query.value('tname'),
+                    sql_query.value('tcontent'),
+                    sql_query.value('teacher'))
 
     def update(self, tname, tcontent, teacher, id_test):
         upd_query = QSqlQuery()
@@ -114,20 +122,12 @@ class View(QTableView):
         hh = self.horizontalHeader()
         hh.setSectionResizeMode(hh.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(2, hh.ResizeMode.Stretch)
-        self.selectAuthors()
-        self.setItemDelegateForColumn(3, ComboBoxDelegate(parent=self))
 
+    @pyqtSlot()
     def add(self):
-        # self.model().insertRow(self.model().rowCount())
         dialog = Dialog(self)
         if dialog.exec():
-            rec = self.conn.record('tests')
-            rec.setValue('id_test', self.model().rowCount())
-            rec.setValue('tname', dialog.tname)
-            rec.setValue('tcontent', dialog.tcontent)
-            rec.setValue('teacher_id', None if dialog.teacher =="" else self.__authors[dialog.teacher])
-            self.model().select()
-
+            self.model().add(dialog.tname, dialog.tcontent, dialog.teacher)
 
     def delete(self):
         ans = QMessageBox.question(self, 'Задача', 'Вы уверены?')
@@ -135,11 +135,86 @@ class View(QTableView):
             self.model().removeRow(self.currentIndex().row())
             self.model().select()
 
-
-
     @property
     def authors(self):
-        return self.__authors.keys()
+        self.model().selectAuthors()
+        return self.model().authors()
+
+class Dialog(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle('Задача')
+
+        tname_lbl = QLabel('&Название', parent=self)
+        self.__tname_edit = QLineEdit(parent=self)
+        tname_lbl.setBuddy(self.__tname_edit)
+
+        tcontent_lbl = QLabel('&Содержание', parent=self)
+        self.__tcontent_edit = QTextEdit(parent=self)
+        tcontent_lbl.setBuddy(self.__tcontent_edit)
+
+        teacher_lbl = QLabel('&Автор', parent=self)
+        self.__teacher_cmb = QComboBox(parent=self)
+        teacher_lbl.setBuddy(self.__teacher_cmb)
+        self.__teacher_cmb.addItem("")
+        self.__teacher_cmb.addItems(parent.authors)
+
+        ok_btn = QPushButton('OK', parent=self)
+        cancel_btn = QPushButton('Отмена', parent=self)
+
+        lay = QVBoxLayout(self)
+        lay.addWidget(tname_lbl)
+        lay.addWidget(self.__tname_edit)
+        lay.addWidget(tcontent_lbl)
+        lay.addWidget(self.__tcontent_edit)
+        lay.addWidget(teacher_lbl)
+        lay.addWidget(self.__teacher_cmb)
+
+        hlay = QHBoxLayout()
+        hlay.addStretch()
+        hlay.addWidget(ok_btn)
+        hlay.addWidget(cancel_btn)
+        lay.addLayout(hlay)
+        self.setLayout(lay)
+
+        cancel_btn.clicked.connect(self.reject)
+        ok_btn.clicked.connect(self.finish)
+
+    @pyqtSlot()
+    def finish(self):
+        if self.tcontent is None:
+            return
+        self.accept()
+
+    @property
+    def tname(self):
+        result = self.__tname_edit.text().strip()
+        if result == '':
+            return None
+        return result
+
+    @tname.setter
+    def tname(self, value):
+        self.__tname_edit.setText(value)
+
+    @property
+    def tcontent(self):
+        result = self.__tcontent_edit.toPlainText().strip()
+        if result == '':
+            return None
+        return result
+
+    @tcontent.setter
+    def tcontent(self, value):
+        self.__tcontent_edit.setPlainText(value)
+
+    @property
+    def teacher(self):
+        return self.__teacher_cmb.currentText()
+
+    @teacher.setter
+    def teacher(self, value):
+        self.__teacher_cmb.setCurrentText(value)
 
 
 
